@@ -33,3 +33,4 @@ class MangaJob(BaseModel):
 class GenerateMangaRequest(BaseModel):
     story_text: str
     style_hint: str = "manga, black and white, clean lineart"
+    selected_character_ids: list[str] = []

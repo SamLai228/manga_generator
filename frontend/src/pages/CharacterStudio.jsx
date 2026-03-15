@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import Lightbox from '../components/Lightbox'
+import ImageEditPanel from '../components/ImageEditPanel'
 
 const TAG_CATEGORIES = ['species', 'hair', 'clothing', 'role', 'personality', 'custom']
 const CATEGORY_LABELS = {
@@ -72,6 +74,9 @@ export default function CharacterStudio() {
   const [suggestedDesc, setSuggestedDesc] = useState('')
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
+  const [lightbox, setLightbox] = useState(null)
+  const [editingAngle, setEditingAngle] = useState(null)
+  const [angleVersions, setAngleVersions] = useState({})
 
   const handlePhotoFiles = (e) => {
     const selected = Array.from(e.target.files)
@@ -148,6 +153,7 @@ export default function CharacterStudio() {
 
   return (
     <div>
+      {lightbox && <Lightbox src={lightbox} alt="角色圖" onClose={() => setLightbox(null)} />}
       <h1 className="section-title">角色工作室</h1>
 
       {error && <div className="error-box">{error}</div>}
@@ -247,12 +253,30 @@ export default function CharacterStudio() {
               <label>生成的角度圖</label>
               <div className="preview-grid">
                 {result.angles.map(angle => (
-                  <img
-                    key={angle}
-                    src={`/api/characters/${result.id}/image/${angle}`}
-                    alt={angle}
-                    className="preview-img"
-                  />
+                  <div key={angle}>
+                    <img
+                      src={`/api/characters/${result.id}/image/${angle}?v=${angleVersions[angle] || 0}`}
+                      alt={angle}
+                      className="preview-img"
+                      onClick={() => setLightbox(`/api/characters/${result.id}/image/${angle}`)}
+                    />
+                    {editingAngle !== angle ? (
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 11, padding: '2px 8px', marginTop: 4, width: '100%' }}
+                        onClick={() => setEditingAngle(angle)}
+                      >
+                        修改圖片
+                      </button>
+                    ) : (
+                      <ImageEditPanel
+                        characterId={result.id}
+                        filename={angle}
+                        onUpdated={() => { setAngleVersions(v => ({ ...v, [angle]: Date.now() })); setEditingAngle(null) }}
+                        onCancel={() => setEditingAngle(null)}
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

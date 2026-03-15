@@ -97,6 +97,7 @@ def build_page_prompt(
     script: MangaScript,
     character_entries: dict[str, Optional[CharacterIndexEntry]],
     global_style: str = "manga style, full color, clean lineart",
+    style_reference_images: list = [],
 ) -> tuple[str, list]:
     """
     Build a single prompt for a 4-panel manga page image.
@@ -135,10 +136,16 @@ def build_page_prompt(
     if has_animal:
         animal_note = "\nIMPORTANT: Characters are animals — do NOT draw human-only actions (no hands in pockets, no pointing fingers, no thumbs up, no waving hands). Use natural animal body language only."
 
+    style_ref_note = ""
+    if style_reference_images:
+        n = len(style_reference_images)
+        style_ref_note = f"\nIMPORTANT: The first {n} attached image(s) are art style references. Adopt their color palette, color scheme, line quality, shading style, and overall visual tone as the dominant aesthetic for the entire page. Prioritize these style images over any other visual references."
+        reference_images = list(style_reference_images) + reference_images
+
     char_consistency_note = ""
-    if reference_images:
+    if any(img for img in reference_images if img not in style_reference_images):
         char_names = ", ".join(all_char_descs.keys())
-        char_consistency_note = f"\nCRITICAL: The attached reference image(s) show the exact character design(s) for {char_names}. Every panel MUST depict these characters with identical appearance — same colors, markings, facial features, body shape, and style as shown in the reference. Do not deviate from the reference design in any way."
+        char_consistency_note = f"\nCRITICAL: The remaining attached image(s) show the character designs for {char_names}. Use them solely to identify each character's appearance — their markings, facial features, body shape, and character-specific colors. Do NOT use these character sheets to influence the overall art style or color palette of the page."
 
     characters_summary = "; ".join(
         f"{n}: {desc}" for n, desc in all_char_descs.items()
@@ -147,7 +154,7 @@ def build_page_prompt(
     prompt = f"""4-panel manga page, 2x2 grid layout, each panel separated by borders.
 
 Characters: {characters_summary}
-{char_consistency_note}
+{style_ref_note}{char_consistency_note}
 {chr(10).join(panel_parts)}
 
 Art style: {global_style}

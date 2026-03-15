@@ -13,10 +13,11 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from models.character import CharacterTags, CharacterIndexEntry, CharacterMetadata
-from services.character_studio.character_registry import register_character, get_character_metadata, update_character_tags
+from services.character_studio.character_registry import register_character, get_character_metadata, update_character_tags, duplicate_character
 from services.character_studio.character_analyzer import analyze_character_from_images
 from services.character_studio.style_extractor import extract_style_from_images
 from services.retrieval.tag_store import list_all_characters, search_characters, remove_character, get_index_stats
+from services.gemini.client import generate_image
 from config.settings import settings
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
@@ -165,6 +166,15 @@ async def register_new_character(
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+@router.post("/{character_id}/duplicate", response_model=CharacterMetadata)
+def duplicate_character_endpoint(character_id: str):
+    """Duplicate a character, creating a copy with a new ID."""
+    new_character = duplicate_character(character_id)
+    if not new_character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    return new_character
+
+
 @router.patch("/{character_id}/tags")
 def update_tags(character_id: str, request: UpdateTagsRequest):
     """Update character tags."""
@@ -172,6 +182,31 @@ def update_tags(character_id: str, request: UpdateTagsRequest):
     if not updated:
         raise HTTPException(status_code=404, detail="Character not found")
     return updated
+
+
+@router.post("/{character_id}/edit-image")
+async def edit_character_image(
+    character_id: str,
+    filename: str = Form(...),
+    instruction: str = Form(...),
+    ref_files: list[UploadFile] = File(default=[]),
+):
+    """Edit a character image using Gemini with the existing image (and optional uploads) as reference."""
+    img_path = settings.characters_dir / character_id / filename
+    if not img_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    temp_dir = tempfile.mkdtemp()
+    try:
+        uploaded_paths = await _save_uploads(ref_files, temp_dir, "ref")
+        reference_images = [img_path] + uploaded_paths
+        prompt = f"Modify this character image: {instruction}. Keep the overall character design and art style consistent."
+        await asyncio.to_thread(generate_image, prompt=prompt, output_path=img_path, reference_images=reference_images)
+    except Exception as e:
+        logger.error(f"Image edit failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+    return {"status": "ok", "filename": filename}
 
 
 @router.delete("/{character_id}")

@@ -68,7 +68,12 @@ def _extract_image_bytes_from_response(response) -> bytes:
     raise ValueError("No image found in response")
 
 
-def generate_image(prompt: str, output_path: Path, reference_images: Optional[list[Path]] = None) -> Path:
+def generate_image(
+    prompt: str,
+    output_path: Path,
+    reference_images: Optional[list[Path]] = None,
+    aspect_ratio: str = "1:1",
+) -> Path:
     """
     Generate an image using Gemini image model and save to output_path.
     Returns the path to the saved image.
@@ -89,6 +94,7 @@ def generate_image(prompt: str, output_path: Path, reference_images: Optional[li
         contents=contents,
         config=genai_types.GenerateContentConfig(
             response_modalities=["IMAGE", "TEXT"],
+            image_config=genai_types.ImageConfig(aspect_ratio=aspect_ratio),
         ),
     )
 

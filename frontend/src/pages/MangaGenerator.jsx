@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
+import CharacterPicker from '../components/CharacterPicker'
 
 
 export default function MangaGenerator() {
   const [story, setStory] = useState('')
   const [styleHint, setStyleHint] = useState('manga, full color, clean lineart')
+  const [selectedCharacterIds, setSelectedCharacterIds] = useState([])
+  const [styleRefFiles, setStyleRefFiles] = useState([])
+  const [styleRefPreviews, setStyleRefPreviews] = useState([])
   const [jobId, setJobId] = useState(null)
   const [jobStatus, setJobStatus] = useState(null)
   const [script, setScript] = useState(null)
@@ -31,6 +35,12 @@ export default function MangaGenerator() {
     return () => clearInterval(pollRef.current)
   }, [jobId])
 
+  const handleStyleRefFiles = (e) => {
+    const files = Array.from(e.target.files).slice(0, 3)
+    setStyleRefFiles(files)
+    setStyleRefPreviews(files.map(f => URL.createObjectURL(f)))
+  }
+
   const previewParse = async () => {
     if (!story.trim()) { setError('請輸入劇情'); return }
     setError('')
@@ -39,7 +49,7 @@ export default function MangaGenerator() {
       const res = await fetch('/api/manga/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story_text: story, style_hint: styleHint }),
+        body: JSON.stringify({ story_text: story, style_hint: styleHint, selected_character_ids: selectedCharacterIds }),
       })
       if (!res.ok) throw new Error(await res.text())
       setPreviewScript(await res.json())
@@ -54,11 +64,12 @@ export default function MangaGenerator() {
     setError('')
     setJobId(null); setJobStatus(null); setScript(null)
     try {
-      const res = await fetch('/api/manga/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story_text: story, style_hint: styleHint }),
-      })
+      const fd = new FormData()
+      fd.append('story_text', story)
+      fd.append('style_hint', styleHint)
+      fd.append('selected_character_ids', JSON.stringify(selectedCharacterIds))
+      styleRefFiles.forEach(f => fd.append('style_ref_files', f))
+      const res = await fetch('/api/manga/generate', { method: 'POST', body: fd })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setJobId(data.job_id)
@@ -94,6 +105,22 @@ export default function MangaGenerator() {
             onChange={e => setStyleHint(e.target.value)}
             placeholder="manga, black and white, clean lineart"
           />
+        </div>
+        <div className="form-group">
+          <label>畫風參考圖（1-3 張，選填）</label>
+          <p className="hint" style={{ margin: '4px 0 8px' }}>上傳參考圖片，生成時會模仿該畫風</p>
+          <input type="file" accept="image/*" multiple onChange={handleStyleRefFiles} className="file-input" />
+          {styleRefPreviews.length > 0 && (
+            <div className="preview-grid">
+              {styleRefPreviews.map((url, i) => (
+                <img key={i} src={url} alt={`style ref ${i}`} className="preview-img" />
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="form-group">
+          <label>指定角色（最多 5 個，選填）</label>
+          <CharacterPicker selectedIds={selectedCharacterIds} onChange={setSelectedCharacterIds} />
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-secondary" onClick={previewParse} disabled={previewing}>

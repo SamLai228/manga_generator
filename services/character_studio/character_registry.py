@@ -114,6 +114,50 @@ def register_character(
     return character
 
 
+def duplicate_character(character_id: str) -> Optional[CharacterMetadata]:
+    """Duplicate an existing character, creating a copy with a new ID."""
+    original = get_character_metadata(character_id)
+    if not original:
+        return None
+
+    new_id = str(uuid.uuid4())[:8]
+    original_dir = settings.characters_dir / character_id
+    new_dir = settings.characters_dir / new_id
+
+    shutil.copytree(original_dir, new_dir)
+
+    # Update reference_images paths
+    new_ref_images = [p.replace(character_id, new_id) for p in original.reference_images]
+
+    new_character = CharacterMetadata(
+        id=new_id,
+        name=f"{original.name} 副本",
+        description=original.description,
+        style_description=original.style_description,
+        tags=original.tags,
+        angles=original.angles,
+        created_at=datetime.utcnow(),
+        reference_images=new_ref_images,
+    )
+
+    meta_path = new_dir / "character.json"
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(new_character.model_dump(), f, ensure_ascii=False, indent=2, default=str)
+
+    index_entry = CharacterIndexEntry(
+        id=new_id,
+        name=new_character.name,
+        tags=new_character.tags,
+        description=new_character.description,
+        style_description=new_character.style_description,
+        sheet_path=str(new_dir / "sheet.png") if (new_dir / "sheet.png").exists() else "",
+    )
+    add_character(index_entry)
+
+    logger.info(f"Character '{original.name}' duplicated as '{new_character.name}' with ID {new_id}")
+    return new_character
+
+
 def get_character_metadata(character_id: str) -> Optional[CharacterMetadata]:
     """Load character metadata from local filesystem."""
     char_dir = settings.characters_dir / character_id

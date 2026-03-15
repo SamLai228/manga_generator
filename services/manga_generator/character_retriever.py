@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from models.character import CharacterIndexEntry, CharacterMetadata
-from services.retrieval.tag_store import get_character_by_name, search_characters
+from services.retrieval.tag_store import get_character_by_name, get_character_by_id, search_characters
 from services.character_studio.character_registry import get_character_metadata
 from config.settings import settings
 
@@ -32,6 +32,43 @@ def retrieve_characters_for_script(
             logger.info(f"Found character '{name}' in index (id={entry.id})")
         else:
             logger.warning(f"Character '{name}' not found in index")
+        results[name] = entry
+    return results
+
+
+def retrieve_characters_for_script_with_overrides(
+    character_names: list[str],
+    preselected_ids: list[str],
+) -> dict[str, Optional[CharacterIndexEntry]]:
+    """
+    Retrieve character index entries, using preselected IDs to override name-based lookup.
+
+    Args:
+        character_names: List of character names from the manga script
+        preselected_ids: List of character IDs explicitly selected by the user
+
+    Returns:
+        Dict mapping character_name -> CharacterIndexEntry (or None if not found)
+    """
+    # Step A: Build name -> entry map from preselected IDs
+    preselected_by_name: dict[str, CharacterIndexEntry] = {}
+    for char_id in preselected_ids:
+        entry = get_character_by_id(char_id)
+        if entry:
+            preselected_by_name[entry.name.lower()] = entry
+
+    # Step B: Resolve each name using preselected map or fallback to name lookup
+    results = {}
+    for name in set(character_names):
+        if name.lower() in preselected_by_name:
+            entry = preselected_by_name[name.lower()]
+            logger.info(f"Using preselected character '{name}' (id={entry.id})")
+        else:
+            entry = get_character_by_name(name)
+            if entry:
+                logger.info(f"Found character '{name}' in index (id={entry.id})")
+            else:
+                logger.warning(f"Character '{name}' not found in index")
         results[name] = entry
     return results
 

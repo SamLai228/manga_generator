@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react'
+import Lightbox from '../components/Lightbox'
+import ImageEditPanel from '../components/ImageEditPanel'
 
 const CATEGORY_LABELS = {
   species: '種族', hair: '髮型', clothing: '服裝',
   role: '角色', personality: '個性', custom: '自訂',
 }
 
-function CharacterCard({ character, onDelete }) {
+function CharacterCard({ character, onDelete, onDuplicate }) {
   const [expanded, setExpanded] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
+  const [lightbox, setLightbox] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [sheetVersion, setSheetVersion] = useState(0)
   const sheetUrl = `/api/characters/${character.id}/image/sheet.png`
 
   const handleDelete = async (e) => {
@@ -22,14 +28,36 @@ function CharacterCard({ character, onDelete }) {
     }
   }
 
+  const handleDuplicate = async (e) => {
+    e.stopPropagation()
+    setDuplicating(true)
+    try {
+      const res = await fetch(`/api/characters/${character.id}/duplicate`, { method: 'POST' })
+      const newCharacter = await res.json()
+      onDuplicate(newCharacter)
+    } catch {
+      // silent fail
+    }
+    setDuplicating(false)
+  }
+
   return (
     <div className="char-card card">
+      {lightbox && <Lightbox src={sheetUrl} alt={`${character.name} sheet`} onClose={() => setLightbox(false)} />}
       <div className="char-card-header" onClick={() => setExpanded(!expanded)}>
         <div>
           <div className="char-name">{character.name}</div>
           <div className="char-id">#{character.id}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            className="btn btn-secondary"
+            onClick={handleDuplicate}
+            disabled={duplicating}
+            style={{ fontSize: 12, padding: '2px 10px' }}
+          >
+            {duplicating ? '...' : '製作副本'}
+          </button>
           <button
             className="btn btn-secondary"
             onClick={handleDelete}
@@ -45,11 +73,28 @@ function CharacterCard({ character, onDelete }) {
       {expanded && (
         <div className="char-card-body">
           <img
-            src={sheetUrl}
+            src={`${sheetUrl}?v=${sheetVersion}`}
             alt={`${character.name} sheet`}
             className="char-sheet-img"
             onError={e => { e.target.style.display = 'none' }}
+            onClick={e => { e.stopPropagation(); setLightbox(true) }}
           />
+          {!editing ? (
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: 12, padding: '2px 10px', marginTop: 6 }}
+              onClick={() => setEditing(true)}
+            >
+              修改圖片
+            </button>
+          ) : (
+            <ImageEditPanel
+              characterId={character.id}
+              filename="sheet.png"
+              onUpdated={() => { setSheetVersion(v => v + 1); setEditing(false) }}
+              onCancel={() => setEditing(false)}
+            />
+          )}
           {character.description && (
             <p className="info-text">{character.description}</p>
           )}
@@ -132,7 +177,14 @@ export default function CharacterLibrary() {
         </div>
       ) : (
         <div className="char-grid">
-          {characters.map(c => <CharacterCard key={c.id} character={c} onDelete={id => setCharacters(prev => prev.filter(x => x.id !== id))} />)}
+          {characters.map(c => (
+            <CharacterCard
+              key={c.id}
+              character={c}
+              onDelete={id => setCharacters(prev => prev.filter(x => x.id !== id))}
+              onDuplicate={newChar => setCharacters(prev => [newChar, ...prev])}
+            />
+          ))}
         </div>
       )}
     </div>
