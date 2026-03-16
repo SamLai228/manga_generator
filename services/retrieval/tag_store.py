@@ -67,6 +67,27 @@ def get_character_by_name(name: str) -> Optional[CharacterIndexEntry]:
     return None
 
 
+def resolve_unique_name(base_name: str, exclude_id: Optional[str] = None) -> str:
+    """
+    Return a unique name derived from base_name.
+    If base_name is not taken, return it as-is.
+    Otherwise return base_name-2, base_name-3, ... (first available).
+    exclude_id: ignore this character's own entry (useful during updates).
+    """
+    entries = _load_index()
+    existing_names = {
+        e["name"].lower()
+        for e in entries
+        if e.get("id") != exclude_id
+    }
+    if base_name.lower() not in existing_names:
+        return base_name
+    n = 2
+    while f"{base_name}-{n}".lower() in existing_names:
+        n += 1
+    return f"{base_name}-{n}"
+
+
 def search_characters(
     name: Optional[str] = None,
     tags: Optional[dict] = None,

@@ -148,7 +148,7 @@ label {
 .hint { color: #8899aa; font-size: 13px; }
 
 /* Character Library */
-.char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
 .char-card { cursor: pointer; }
 .char-card-header { display: flex; justify-content: space-between; align-items: center; }
 .char-name { font-size: 18px; font-weight: 600; color: #e0e0e0; }

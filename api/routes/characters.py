@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from models.character import CharacterTags, CharacterIndexEntry, CharacterMetadata
@@ -69,7 +69,11 @@ def get_character_image(character_id: str, filename: str):
     image_path = char_dir / filename
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")
-    return FileResponse(str(image_path), media_type="image/png")
+    return FileResponse(
+        str(image_path),
+        media_type="image/png",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 async def _save_uploads(uploads: list[UploadFile], temp_dir: str, prefix: str) -> list[Path]:

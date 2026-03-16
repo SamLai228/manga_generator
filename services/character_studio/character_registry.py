@@ -13,7 +13,7 @@ from models.character import CharacterMetadata, CharacterTags, CharacterIndexEnt
 from services.character_studio.style_extractor import extract_style_from_images
 from services.character_studio.character_analyzer import analyze_character_from_images
 from services.character_studio.multi_angle_generator import generate_character_sheet
-from services.retrieval.tag_store import add_character
+from services.retrieval.tag_store import add_character, resolve_unique_name
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,7 @@ def register_character(
     Returns:
         CharacterMetadata for the registered character
     """
+    name = resolve_unique_name(name)
     character_id = str(uuid.uuid4())[:8]
     char_dir = settings.characters_dir / character_id
     char_dir.mkdir(parents=True, exist_ok=True)

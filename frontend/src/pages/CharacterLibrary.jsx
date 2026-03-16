@@ -13,7 +13,7 @@ function CharacterCard({ character, onDelete, onDuplicate }) {
   const [duplicating, setDuplicating] = useState(false)
   const [lightbox, setLightbox] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [sheetVersion, setSheetVersion] = useState(0)
+  const [sheetVersion, setSheetVersion] = useState(() => Date.now())
   const sheetUrl = `/api/characters/${character.id}/image/sheet.png`
 
   const handleDelete = async (e) => {
@@ -43,7 +43,7 @@ function CharacterCard({ character, onDelete, onDuplicate }) {
 
   return (
     <div className="char-card card">
-      {lightbox && <Lightbox src={sheetUrl} alt={`${character.name} sheet`} onClose={() => setLightbox(false)} />}
+      {lightbox && <Lightbox src={`${sheetUrl}?v=${sheetVersion}`} alt={`${character.name} sheet`} onClose={() => setLightbox(false)} />}
       <div className="char-card-header" onClick={() => setExpanded(!expanded)}>
         <div>
           <div className="char-name">{character.name}</div>
@@ -91,7 +91,7 @@ function CharacterCard({ character, onDelete, onDuplicate }) {
             <ImageEditPanel
               characterId={character.id}
               filename="sheet.png"
-              onUpdated={() => { setSheetVersion(v => v + 1); setEditing(false) }}
+              onUpdated={() => { setSheetVersion(Date.now()); setEditing(false) }}
               onCancel={() => setEditing(false)}
             />
           )}
