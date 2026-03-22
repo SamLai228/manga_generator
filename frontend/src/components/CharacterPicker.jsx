@@ -50,7 +50,10 @@ export default function CharacterPicker({ selectedIds, onChange }) {
       <div className="char-picker-selected">
         {selectedChars.map(c => (
           <div key={c.id} className="char-picker-chip">
-            <img src={`/api/characters/${c.id}/image/sheet.png`} alt={c.name} />
+            <div className="char-picker-chip-portrait">
+              <img className="char-picker-chip-portrait-img" src={`/api/characters/${c.id}/image/sheet.png`} alt={c.name} />
+              <div className="cs-portrait-scanline" />
+            </div>
             <span className="char-picker-chip-name">{c.name}</span>
             <button className="char-picker-remove" onClick={() => remove(c.id)}>×</button>
           </div>
@@ -88,7 +91,9 @@ export default function CharacterPicker({ selectedIds, onChange }) {
                   className={`char-picker-row${isSelected ? ' selected' : ''}${isDisabled ? ' disabled' : ''}`}
                   onClick={() => !isDisabled && toggle(c.id)}
                 >
-                  <img src={`/api/characters/${c.id}/image/sheet.png`} alt={c.name} />
+                  <div className="char-picker-row-portrait">
+                    <img className="char-picker-row-portrait-img" src={`/api/characters/${c.id}/image/sheet.png`} alt={c.name} />
+                  </div>
                   <div className="char-picker-row-info">
                     <strong>{c.name}</strong>
                     <span>{c.id}</span>

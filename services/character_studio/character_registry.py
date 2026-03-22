@@ -170,6 +170,33 @@ def get_character_metadata(character_id: str) -> Optional[CharacterMetadata]:
     return CharacterMetadata(**data)
 
 
+def update_character_name(character_id: str, name: str) -> Optional[CharacterMetadata]:
+    """Update the name of an existing character."""
+    character = get_character_metadata(character_id)
+    if not character:
+        return None
+
+    character.name = name
+    char_dir = settings.characters_dir / character_id
+    meta_path = char_dir / "character.json"
+
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(character.model_dump(), f, ensure_ascii=False, indent=2, default=str)
+
+    # Update index entry
+    index_entry = CharacterIndexEntry(
+        id=character_id,
+        name=name,
+        tags=character.tags,
+        description=character.description,
+        style_description=character.style_description,
+        sheet_path=str(char_dir / "sheet.png") if (char_dir / "sheet.png").exists() else "",
+    )
+    add_character(index_entry)
+
+    return character
+
+
 def update_character_tags(character_id: str, tags: CharacterTags) -> Optional[CharacterMetadata]:
     """Update tags for an existing character."""
     character = get_character_metadata(character_id)

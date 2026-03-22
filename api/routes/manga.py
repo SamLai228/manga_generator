@@ -15,8 +15,9 @@ from fastapi.responses import FileResponse
 from models.manga import GenerateMangaRequest, MangaJob, MangaScript
 from services.manga_generator.story_parser import parse_story
 from services.manga_generator.panel_enricher import build_page_prompt
-from services.manga_generator.character_retriever import retrieve_characters_for_script_with_overrides
+from services.manga_generator.character_retriever import retrieve_characters_for_script
 from services.gemini.client import generate_image
+from services.retrieval.tag_store import get_character_by_id
 from config.settings import settings
 
 router = APIRouter(prefix="/api/manga", tags=["manga"])
@@ -66,10 +67,24 @@ def _run_manga_generation(job_id: str, story_text: str, style_hint: str, selecte
         job.script = script
         _save_job(job)
 
-        # Step 2: Generate single 4-panel manga image
+        # Step 2: Resolve characters
         logger.info(f"[{job_id}] Generating manga page...")
-        all_names = [name for panel in script.panels for name in panel.characters]
-        character_entries = retrieve_characters_for_script_with_overrides(all_names, selected_character_ids)
+        if selected_character_ids:
+            # Bypass story name matching — build entries directly from preselected IDs
+            character_entries = {}
+            for char_id in selected_character_ids:
+                entry = get_character_by_id(char_id)
+                if entry:
+                    character_entries[entry.name] = entry
+            # Force every panel to feature the preselected characters
+            char_names = list(character_entries.keys())
+            for panel in script.panels:
+                panel.characters = char_names
+        else:
+            # No preselection: fall back to name-based lookup from story
+            all_names = [name for panel in script.panels for name in panel.characters]
+            character_entries = retrieve_characters_for_script(all_names)
+
         prompt, reference_images = build_page_prompt(script, character_entries, style_hint, style_ref_paths)
         output_path = job_dir / "page.png"
         generate_image(prompt=prompt, output_path=output_path, reference_images=reference_images or None)
@@ -112,9 +127,12 @@ async def generate_manga(
     Returns job_id to poll for status.
     """
     job_id = str(uuid.uuid4())[:8]
+    char_ids = json.loads(selected_character_ids)
     job = MangaJob(
         id=job_id,
         story_text=story_text,
+        style_hint=style_hint,
+        selected_character_ids=char_ids,
         status="pending",
         created_at=datetime.utcnow(),
     )
@@ -122,8 +140,8 @@ async def generate_manga(
 
     job_dir = settings.manga_dir / job_id
     style_ref_paths = await _save_style_refs(style_ref_files[:3], job_dir)
-
-    char_ids = json.loads(selected_character_ids)
+    job.style_ref_filenames = [p.name for p in style_ref_paths]
+    _save_job(job)
 
     background_tasks.add_task(
         _run_manga_generation,
@@ -164,6 +182,85 @@ def get_panel_image(job_id: str, panel_num: int):
     if not panel_path.exists():
         raise HTTPException(status_code=404, detail="Panel image not found")
     return FileResponse(str(panel_path), media_type="image/png")
+
+
+@router.post("/jobs/{job_id}/duplicate")
+def duplicate_manga_job(job_id: str):
+    """Duplicate a manga job, copying all files to a new job directory."""
+    job = _load_job(job_id)
+    src_dir = settings.manga_dir / job_id
+
+    new_id = str(uuid.uuid4())[:8]
+    new_dir = settings.manga_dir / new_id
+    shutil.copytree(src_dir, new_dir)
+
+    new_job = job.model_copy(update={"id": new_id, "created_at": datetime.utcnow()})
+    if new_job.output_path:
+        new_job.output_path = str(new_dir / "page.png")
+    meta_path = new_dir / "metadata.json"
+    with open(meta_path, "w") as f:
+        json.dump(new_job.model_dump(), f, ensure_ascii=False, indent=2, default=str)
+
+    return new_job
+
+
+@router.post("/jobs/{job_id}/edit")
+async def edit_manga_page(
+    job_id: str,
+    instruction: str = Form(...),
+    ref_files: list[UploadFile] = File(default=[]),
+):
+    """Edit an existing manga page with a modification instruction."""
+    job = _load_job(job_id)
+    if job.status != "done":
+        raise HTTPException(status_code=425, detail=f"Job not done (status: {job.status})")
+
+    job_dir = settings.manga_dir / job_id
+
+    # Rebuild character entries from saved IDs
+    character_entries = {}
+    if job.selected_character_ids:
+        for char_id in job.selected_character_ids:
+            entry = get_character_by_id(char_id)
+            if entry:
+                character_entries[entry.name] = entry
+        char_names = list(character_entries.keys())
+        if job.script:
+            for panel in job.script.panels:
+                panel.characters = char_names
+    elif job.script:
+        all_names = [name for panel in job.script.panels for name in panel.characters]
+        character_entries = retrieve_characters_for_script(all_names)
+
+    # Rebuild style ref paths from saved filenames
+    style_ref_paths = [job_dir / fn for fn in job.style_ref_filenames if (job_dir / fn).exists()]
+
+    # Save uploaded ref files
+    uploaded_ref_paths = []
+    for i, upload in enumerate(ref_files):
+        suffix = Path(upload.filename).suffix if upload.filename else ".png"
+        path = job_dir / f"edit_ref_{i}{suffix}"
+        with open(path, "wb") as f:
+            f.write(await upload.read())
+        uploaded_ref_paths.append(path)
+
+    # Build prompt from script
+    if job.script:
+        base_prompt, reference_images = build_page_prompt(job.script, character_entries, job.style_hint, style_ref_paths)
+    else:
+        base_prompt = job.story_text
+        reference_images = list(style_ref_paths)
+
+    prompt = f"{base_prompt}\n\nUser modification request: {instruction}"
+
+    # Prepend existing page as first reference
+    page_path = job_dir / "page.png"
+    all_refs = ([page_path] if page_path.exists() else []) + reference_images + uploaded_ref_paths
+
+    output_path = job_dir / "page.png"
+    generate_image(prompt=prompt, output_path=output_path, reference_images=all_refs or None)
+
+    return {"status": "ok"}
 
 
 @router.get("/jobs")

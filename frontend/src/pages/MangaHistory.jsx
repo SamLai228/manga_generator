@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import MangaEditPanel from '../components/MangaEditPanel'
+import Lightbox from '../components/Lightbox'
 
 const STATUS_LABEL = { pending: '等待中', processing: '生成中', done: '完成', error: '失敗' }
 const STATUS_CLASS = { pending: 'status-pending', processing: 'status-processing', done: 'status-done', error: 'status-error' }
@@ -10,8 +12,26 @@ function formatDate(dateStr) {
 }
 
 export default function MangaHistory() {
+  const navigate = useNavigate()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [editingJobId, setEditingJobId] = useState(null)
+  const [imgKeys, setImgKeys] = useState({})
+  const [lightboxJobId, setLightboxJobId] = useState(null)
+  const [duplicating, setDuplicating] = useState(null)
+
+  const handleDuplicate = async (jobId) => {
+    setDuplicating(jobId)
+    try {
+      const res = await fetch(`/api/manga/jobs/${jobId}/duplicate`, { method: 'POST' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const newJob = await res.json()
+      setJobs(prev => [newJob, ...prev])
+    } catch (e) {
+      alert(`製作副本失敗：${e.message}`)
+    }
+    setDuplicating(null)
+  }
 
   useEffect(() => {
     fetch('/api/manga/jobs')
@@ -20,8 +40,17 @@ export default function MangaHistory() {
       .catch(() => setLoading(false))
   }, [])
 
+  const lightboxJob = lightboxJobId ? jobs.find(j => j.id === lightboxJobId) : null
+
   return (
     <div>
+      {lightboxJob && (
+        <Lightbox
+          src={`/api/manga/jobs/${lightboxJob.id}/page${imgKeys[lightboxJob.id] ? `?t=${imgKeys[lightboxJob.id]}` : ''}`}
+          alt={`manga ${lightboxJob.id}`}
+          onClose={() => setLightboxJobId(null)}
+        />
+      )}
       <h1 className="section-title">生成歷史</h1>
 
       {loading ? (
@@ -58,25 +87,80 @@ export default function MangaHistory() {
 
               {job.status === 'done' && (
                 <div>
-                  <img
-                    src={`/api/manga/jobs/${job.id}/page`}
-                    alt={`manga ${job.id}`}
-                    style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 6, marginBottom: 8, display: 'block' }}
-                    onError={e => { e.target.style.display = 'none' }}
-                  />
-                  <a
-                    href={`/api/manga/jobs/${job.id}/page`}
-                    download={`manga_${job.id}.png`}
-                    className="btn btn-secondary"
-                    style={{ fontSize: 13 }}
+                  <div
+                    className="cs-detail-sheet-wrapper"
+                    style={{ marginBottom: 8 }}
+                    onClick={() => setLightboxJobId(job.id)}
                   >
-                    下載漫畫
-                  </a>
+                    <img
+                      key={imgKeys[job.id] || 0}
+                      src={`/api/manga/jobs/${job.id}/page${imgKeys[job.id] ? `?t=${imgKeys[job.id]}` : ''}`}
+                      alt={`manga ${job.id}`}
+                      style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 6, display: 'block' }}
+                      onError={e => { e.target.parentElement.style.display = 'none' }}
+                    />
+                    <div className="cs-detail-sheet-hint">點擊放大</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: editingJobId === job.id ? 12 : 0 }}>
+                    <a
+                      href={`/api/manga/jobs/${job.id}/page`}
+                      download={`manga_${job.id}.png`}
+                      className="btn btn-secondary"
+                      style={{ fontSize: 13 }}
+                    >
+                      下載漫畫
+                    </a>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ fontSize: 13 }}
+                      onClick={() => setEditingJobId(id => id === job.id ? null : job.id)}
+                    >
+                      {editingJobId === job.id ? '收合修改' : '修改漫畫'}
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ fontSize: 13 }}
+                      onClick={() => handleDuplicate(job.id)}
+                      disabled={duplicating === job.id}
+                    >
+                      {duplicating === job.id ? '複製中...' : '製作副本'}
+                    </button>
+                    {job.story_text && (
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 13 }}
+                        onClick={() => navigate(`/generate?story=${encodeURIComponent(job.story_text)}`)}
+                      >
+                        用同一故事重新生成
+                      </button>
+                    )}
+                  </div>
+                  {editingJobId === job.id && (
+                    <MangaEditPanel
+                      jobId={job.id}
+                      onUpdated={() => {
+                        setEditingJobId(null)
+                        setImgKeys(k => ({ ...k, [job.id]: Date.now() }))
+                      }}
+                      onCancel={() => setEditingJobId(null)}
+                    />
+                  )}
                 </div>
               )}
 
-              {job.status === 'error' && job.error && (
-                <div className="error-box" style={{ marginTop: 8 }}>失敗原因：{job.error}</div>
+              {job.status === 'error' && (
+                <div>
+                  {job.error && <div className="error-box" style={{ marginTop: 8 }}>失敗原因：{job.error}</div>}
+                  {job.story_text && (
+                    <button
+                      className="btn btn-secondary"
+                      style={{ fontSize: 13, marginTop: 8 }}
+                      onClick={() => navigate(`/generate?story=${encodeURIComponent(job.story_text)}`)}
+                    >
+                      重試
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           ))}

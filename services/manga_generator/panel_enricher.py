@@ -136,16 +136,38 @@ def build_page_prompt(
     if has_animal:
         animal_note = "\nIMPORTANT: Characters are animals — do NOT draw human-only actions (no hands in pockets, no pointing fingers, no thumbs up, no waving hands). Use natural animal body language only."
 
+    # Capture whether we have char sheets before prepending style refs
+    has_char_sheets = bool(reference_images)
+
     style_ref_note = ""
+    char_consistency_note = ""
+    art_style_line = f"\nArt style: {global_style}"
+
     if style_reference_images:
         n = len(style_reference_images)
         style_ref_note = f"\nIMPORTANT: The first {n} attached image(s) are art style references. Adopt their color palette, color scheme, line quality, shading style, and overall visual tone as the dominant aesthetic for the entire page. Prioritize these style images over any other visual references."
         reference_images = list(style_reference_images) + reference_images
-
-    char_consistency_note = ""
-    if any(img for img in reference_images if img not in style_reference_images):
-        char_names = ", ".join(all_char_descs.keys())
-        char_consistency_note = f"\nCRITICAL: The remaining attached image(s) show the character designs for {char_names}. Use them solely to identify each character's appearance — their markings, facial features, body shape, and character-specific colors. Do NOT use these character sheets to influence the overall art style or color palette of the page."
+        if has_char_sheets:
+            char_names = ", ".join(all_char_descs.keys())
+            char_consistency_note = (
+                f"\nCRITICAL: The remaining attached image(s) are character design sheets for {char_names}. "
+                "Every character in this manga MUST look EXACTLY like their design sheet — "
+                "same face, hair, clothing, colors, and markings in every single panel. "
+                "Do NOT let the character sheets influence the overall art style."
+            )
+    else:
+        # No style ref: character sheets define BOTH appearance AND art style
+        if has_char_sheets:
+            char_names_str = ", ".join(all_char_descs.keys())
+            char_consistency_note = (
+                f"\nCRITICAL: The attached image(s) are the character design sheets for {char_names_str}. "
+                "They define BOTH the exact appearance of each character AND the art style for this entire manga page. "
+                "Reproduce their visual style (line quality, coloring, shading, rendering technique) faithfully as the dominant aesthetic. "
+                "Every character MUST look EXACTLY like their design sheet in every panel — "
+                "same face, hair, clothing, colors, and markings."
+            )
+            # Remove generic art style line so design sheets fully control the aesthetic
+            art_style_line = ""
 
     characters_summary = "; ".join(
         f"{n}: {desc}" for n, desc in all_char_descs.items()
@@ -156,8 +178,7 @@ def build_page_prompt(
 Characters: {characters_summary}
 {style_ref_note}{char_consistency_note}
 {chr(10).join(panel_parts)}
-
-Art style: {global_style}
+{art_style_line}
 {animal_note}
 manga page, panel borders, high quality manga art, clean lineart"""
 

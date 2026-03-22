@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from models.character import CharacterTags, CharacterIndexEntry, CharacterMetadata
-from services.character_studio.character_registry import register_character, get_character_metadata, update_character_tags, duplicate_character
+from services.character_studio.character_registry import register_character, get_character_metadata, update_character_tags, update_character_name, duplicate_character
 from services.character_studio.character_analyzer import analyze_character_from_images
 from services.character_studio.style_extractor import extract_style_from_images
 from services.retrieval.tag_store import list_all_characters, search_characters, remove_character, get_index_stats
@@ -33,6 +33,10 @@ class RegisterRequest(BaseModel):
     additional_description: str = ""
     confirmed_tags: Optional[CharacterTags] = None
     generate_angles: bool = True
+
+
+class UpdateNameRequest(BaseModel):
+    name: str
 
 
 class UpdateTagsRequest(BaseModel):
@@ -181,6 +185,18 @@ def duplicate_character_endpoint(character_id: str):
     if not new_character:
         raise HTTPException(status_code=404, detail="Character not found")
     return new_character
+
+
+@router.patch("/{character_id}/name")
+def update_name(character_id: str, request: UpdateNameRequest):
+    """Update character name."""
+    name = request.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name cannot be empty")
+    updated = update_character_name(character_id, name)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Character not found")
+    return updated
 
 
 @router.patch("/{character_id}/tags")

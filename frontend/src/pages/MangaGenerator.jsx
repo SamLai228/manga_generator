@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import CharacterPicker from '../components/CharacterPicker'
+import MangaEditPanel from '../components/MangaEditPanel'
+import Lightbox from '../components/Lightbox'
 
 const STORY_TEMPLATES = [
   { label: '偶遇相識', text: '兩個角色在街上偶然相遇，互相打招呼，聊了幾句後約好下次再見。' },
@@ -9,9 +12,14 @@ const STORY_TEMPLATES = [
 
 
 export default function MangaGenerator() {
-  const [story, setStory] = useState('')
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const [story, setStory] = useState(() => searchParams.get('story') ?? '')
   const [styleHint, setStyleHint] = useState('manga, full color, clean lineart')
-  const [selectedCharacterIds, setSelectedCharacterIds] = useState([])
+  const [selectedCharacterIds, setSelectedCharacterIds] = useState(() => {
+    const id = searchParams.get('character')
+    return id ? [id] : []
+  })
   const [styleRefFiles, setStyleRefFiles] = useState([])
   const [styleRefPreviews, setStyleRefPreviews] = useState([])
   const [jobId, setJobId] = useState(null)
@@ -20,6 +28,9 @@ export default function MangaGenerator() {
   const [error, setError] = useState('')
   const [previewScript, setPreviewScript] = useState(null)
   const [previewing, setPreviewing] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+  const [imgKey, setImgKey] = useState(0)
+  const [lightbox, setLightbox] = useState(false)
   const pollRef = useRef(null)
 
   // Poll job status
@@ -193,12 +204,27 @@ export default function MangaGenerator() {
 
           {isDone && (
             <div style={{ textAlign: 'center' }}>
-              <img
-                src={`/api/manga/jobs/${jobId}/page`}
-                alt="四格漫畫"
-                style={{ maxWidth: '100%', borderRadius: 8, marginBottom: 16 }}
-              />
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {lightbox && (
+                <Lightbox
+                  src={`/api/manga/jobs/${jobId}/page?t=${imgKey}`}
+                  alt="四格漫畫"
+                  onClose={() => setLightbox(false)}
+                />
+              )}
+              <div
+                className="cs-detail-sheet-wrapper"
+                style={{ marginBottom: 16, display: 'inline-block' }}
+                onClick={() => setLightbox(true)}
+              >
+                <img
+                  key={imgKey}
+                  src={`/api/manga/jobs/${jobId}/page?t=${imgKey}`}
+                  alt="四格漫畫"
+                  style={{ maxWidth: '100%', borderRadius: 8, display: 'block' }}
+                />
+                <div className="cs-detail-sheet-hint">點擊放大</div>
+              </div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: showEdit ? 16 : 0 }}>
                 <a
                   href={`/api/manga/jobs/${jobId}/page`}
                   download={`manga_${jobId}.png`}
@@ -208,11 +234,27 @@ export default function MangaGenerator() {
                 </a>
                 <button
                   className="btn btn-secondary"
-                  onClick={() => { setJobId(null); setJobStatus(null); setScript(null); setPreviewScript(null) }}
+                  onClick={() => setShowEdit(v => !v)}
+                >
+                  {showEdit ? '收合修改' : '修改漫畫'}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => { setJobId(null); setJobStatus(null); setScript(null); setPreviewScript(null); setShowEdit(false) }}
                 >
                   修改故事重新生成
                 </button>
+                <button className="btn btn-secondary" onClick={() => navigate('/history')}>
+                  查看歷史紀錄
+                </button>
               </div>
+              {showEdit && (
+                <MangaEditPanel
+                  jobId={jobId}
+                  onUpdated={() => { setShowEdit(false); setImgKey(Date.now()) }}
+                  onCancel={() => setShowEdit(false)}
+                />
+              )}
             </div>
           )}
 

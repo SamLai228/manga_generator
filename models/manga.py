@@ -28,6 +28,9 @@ class MangaJob(BaseModel):
     status: str = "pending"  # pending, processing, done, error
     error: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    style_hint: str = "manga, black and white, clean lineart"
+    selected_character_ids: list[str] = []
+    style_ref_filenames: list[str] = []  # e.g. ["style_ref_0.png"]
 
 
 class GenerateMangaRequest(BaseModel):

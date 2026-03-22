@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Lightbox from '../components/Lightbox'
 import ImageEditPanel from '../components/ImageEditPanel'
 import TagEditor from '../components/TagEditor'
@@ -7,6 +8,7 @@ const ANALYZING_MSGS = ['分析圖片特徵中...', '識別外觀與個性...', 
 const REGISTERING_MSGS = ['建立角色資料...', '生成正面角度圖...', '生成側面與背面圖...', '整理入庫中...']
 
 export default function CharacterStudio() {
+  const navigate = useNavigate()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [photoFiles, setPhotoFiles] = useState([])
@@ -249,9 +251,13 @@ export default function CharacterStudio() {
               </div>
             </div>
           )}
-          <button className="btn btn-primary" onClick={reset} style={{ marginTop: 16 }}>
-            新增另一個角色
-          </button>
+          <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" onClick={reset}>新增另一個角色</button>
+            <button className="btn btn-secondary" onClick={() => navigate('/library')}>查看角色圖庫</button>
+            <button className="btn btn-primary" onClick={() => navigate(`/generate?character=${result.id}`)}>
+              用此角色生成漫畫 →
+            </button>
+          </div>
         </div>
       )}
     </div>
