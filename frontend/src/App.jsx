@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import CharacterStudio from './pages/CharacterStudio.jsx'
 import CharacterLibrary from './pages/CharacterLibrary.jsx'
 import MangaGenerator from './pages/MangaGenerator.jsx'
+import MangaHistory from './pages/MangaHistory.jsx'
 import './App.css'
 
 class ErrorBoundary extends React.Component {
@@ -40,6 +41,9 @@ export default function App() {
             <NavLink to="/generate" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               生成漫畫
             </NavLink>
+            <NavLink to="/history" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              歷史紀錄
+            </NavLink>
           </div>
         </nav>
         <main className="main-content">
@@ -48,6 +52,7 @@ export default function App() {
               <Route path="/" element={<CharacterStudio />} />
               <Route path="/library" element={<CharacterLibrary />} />
               <Route path="/generate" element={<MangaGenerator />} />
+              <Route path="/history" element={<MangaHistory />} />
             </Routes>
           </ErrorBoundary>
         </main>

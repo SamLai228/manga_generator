@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import Lightbox from '../components/Lightbox'
 import ImageEditPanel from '../components/ImageEditPanel'
+import TagEditor from '../components/TagEditor'
 
 const CATEGORY_LABELS = {
   species: '種族', hair: '髮型', clothing: '服裝',
@@ -14,6 +15,9 @@ function CharacterCard({ character, onDelete, onDuplicate }) {
   const [lightbox, setLightbox] = useState(false)
   const [editing, setEditing] = useState(false)
   const [sheetVersion, setSheetVersion] = useState(() => Date.now())
+  const [editingTags, setEditingTags] = useState(false)
+  const [editedTags, setEditedTags] = useState(character.tags || {})
+  const [savingTags, setSavingTags] = useState(false)
   const sheetUrl = `/api/characters/${character.id}/image/sheet.png`
 
   const handleDelete = async (e) => {
@@ -26,6 +30,20 @@ function CharacterCard({ character, onDelete, onDuplicate }) {
     } catch {
       setDeleting(false)
     }
+  }
+
+  const handleSaveTags = async (e) => {
+    e.stopPropagation()
+    setSavingTags(true)
+    try {
+      await fetch(`/api/characters/${character.id}/tags`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: editedTags }),
+      })
+      setEditingTags(false)
+    } catch {}
+    setSavingTags(false)
   }
 
   const handleDuplicate = async (e) => {
@@ -98,16 +116,39 @@ function CharacterCard({ character, onDelete, onDuplicate }) {
           {character.description && (
             <p className="info-text">{character.description}</p>
           )}
-          <div className="tags-section">
-            {Object.entries(character.tags || {}).map(([cat, tagList]) =>
-              tagList && tagList.length > 0 ? (
-                <div key={cat} className="tag-row-compact">
-                  <span className="cat-label">{CATEGORY_LABELS[cat] || cat}：</span>
-                  {tagList.map(t => <span key={t} className="tag">{t}</span>)}
-                </div>
-              ) : null
-            )}
-          </div>
+          {editingTags ? (
+            <div onClick={e => e.stopPropagation()}>
+              <TagEditor tags={editedTags} onChange={setEditedTags} />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button className="btn btn-primary" onClick={handleSaveTags} disabled={savingTags} style={{ fontSize: 12 }}>
+                  {savingTags ? '儲存中...' : '儲存標籤'}
+                </button>
+                <button className="btn btn-secondary" onClick={e => { e.stopPropagation(); setEditingTags(false) }} style={{ fontSize: 12 }}>
+                  取消
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="tags-section">
+                {Object.entries(character.tags || {}).map(([cat, tagList]) =>
+                  tagList && tagList.length > 0 ? (
+                    <div key={cat} className="tag-row-compact">
+                      <span className="cat-label">{CATEGORY_LABELS[cat] || cat}：</span>
+                      {tagList.map(t => <span key={t} className="tag">{t}</span>)}
+                    </div>
+                  ) : null
+                )}
+              </div>
+              <button
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: '2px 10px', marginTop: 8 }}
+                onClick={e => { e.stopPropagation(); setEditingTags(true) }}
+              >
+                編輯標籤
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -117,6 +158,7 @@ function CharacterCard({ character, onDelete, onDuplicate }) {
 export default function CharacterLibrary() {
   const [characters, setCharacters] = useState([])
   const [search, setSearch] = useState('')
+  const [tagFilter, setTagFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState(null)
 
@@ -125,10 +167,14 @@ export default function CharacterLibrary() {
     fetchStats()
   }, [])
 
-  const fetchCharacters = async (name = '') => {
+  const fetchCharacters = async (name = '', tag = '') => {
     setLoading(true)
     try {
-      const url = name ? `/api/characters/?name=${encodeURIComponent(name)}` : '/api/characters/'
+      const params = new URLSearchParams()
+      if (name) params.append('name', name)
+      if (tag) params.append('tag', tag)
+      const qs = params.toString()
+      const url = `/api/characters/${qs ? '?' + qs : ''}`
       const res = await fetch(url)
       const data = await res.json()
       setCharacters(data)
@@ -148,7 +194,13 @@ export default function CharacterLibrary() {
   const handleSearch = (e) => {
     const val = e.target.value
     setSearch(val)
-    fetchCharacters(val)
+    fetchCharacters(val, tagFilter)
+  }
+
+  const handleTagFilter = (e) => {
+    const val = e.target.value
+    setTagFilter(val)
+    fetchCharacters(search, val)
   }
 
   return (
@@ -160,12 +212,20 @@ export default function CharacterLibrary() {
         )}
       </div>
 
-      <input
-        value={search}
-        onChange={handleSearch}
-        placeholder="搜尋角色名稱..."
-        style={{ marginBottom: 20 }}
-      />
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        <input
+          value={search}
+          onChange={handleSearch}
+          placeholder="搜尋角色名稱..."
+          style={{ flex: 1 }}
+        />
+        <input
+          value={tagFilter}
+          onChange={handleTagFilter}
+          placeholder="篩選標籤（如：黑髮）"
+          style={{ flex: 1 }}
+        />
+      </div>
 
       {loading ? (
         <div className="card center"><div className="spinner" /></div>

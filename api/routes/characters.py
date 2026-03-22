@@ -39,11 +39,15 @@ class UpdateTagsRequest(BaseModel):
     tags: CharacterTags
 
 
+TAG_CATEGORIES = ['species', 'hair', 'clothing', 'role', 'personality', 'custom']
+
+
 @router.get("/", response_model=list[CharacterIndexEntry])
-def list_characters(name: Optional[str] = None):
-    """List all characters or search by name."""
-    if name:
-        return search_characters(name=name)
+def list_characters(name: Optional[str] = None, tag: Optional[str] = None):
+    """List all characters or search by name and/or tag."""
+    if name or tag:
+        tags_filter = {cat: [tag] for cat in TAG_CATEGORIES} if tag else None
+        return search_characters(name=name, tags=tags_filter, match_all=False)
     return list_all_characters()
 
 
@@ -215,8 +219,25 @@ async def edit_character_image(
 
 @router.delete("/{character_id}")
 def delete_character(character_id: str):
-    """Delete a character from the index (does not delete files)."""
+    """Delete a character from the index and remove its files."""
     removed = remove_character(character_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Character not found")
+    char_dir = settings.characters_dir / character_id
+    if char_dir.exists():
+        shutil.rmtree(char_dir, ignore_errors=True)
     return {"status": "deleted", "id": character_id}
+
+
+@router.get("/{character_id}/reference/{filename}")
+def get_reference_image(character_id: str, filename: str):
+    """Serve a reference image for a character."""
+    char_dir = settings.characters_dir / character_id
+    image_path = char_dir / filename
+    if not image_path.exists() or image_path.suffix.lower() not in {'.png', '.jpg', '.jpeg', '.webp'}:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(
+        str(image_path),
+        media_type="image/png",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )

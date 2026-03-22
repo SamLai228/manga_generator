@@ -5,7 +5,7 @@ from pathlib import Path
 class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_text_model: str = "gemini-3-flash-preview"
-    gemini_image_model: str = "nano-banana-pro-preview"
+    gemini_image_model: str = "gemini-3.1-flash-image-preview"
 
     data_dir: Path = Path("data")
     characters_dir: Path = Path("data/characters")

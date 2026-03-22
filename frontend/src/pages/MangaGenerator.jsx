@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
 import CharacterPicker from '../components/CharacterPicker'
 
+const STORY_TEMPLATES = [
+  { label: '偶遇相識', text: '兩個角色在街上偶然相遇，互相打招呼，聊了幾句後約好下次再見。' },
+  { label: '輕鬆對話', text: '兩個角色在咖啡廳坐下來聊天，分享近況，一起大笑，心情輕鬆愉快。' },
+  { label: '動作冒險', text: '主角發現危機逼近，全力應對，成功化解後，筋疲力盡地坐下休息。' },
+]
+
 
 export default function MangaGenerator() {
   const [story, setStory] = useState('')
@@ -97,6 +103,18 @@ export default function MangaGenerator() {
             placeholder="例：小明看到一隻貓，開心地追著貓跑，結果摔倒了，貓回頭看著他。"
             rows={4}
           />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            {STORY_TEMPLATES.map(t => (
+              <button
+                key={t.label}
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: '3px 10px' }}
+                onClick={() => setStory(t.text)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="form-group">
           <label>畫風提示</label>
@@ -180,7 +198,7 @@ export default function MangaGenerator() {
                 alt="四格漫畫"
                 style={{ maxWidth: '100%', borderRadius: 8, marginBottom: 16 }}
               />
-              <div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <a
                   href={`/api/manga/jobs/${jobId}/page`}
                   download={`manga_${jobId}.png`}
@@ -188,6 +206,12 @@ export default function MangaGenerator() {
                 >
                   下載漫畫
                 </a>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => { setJobId(null); setJobStatus(null); setScript(null); setPreviewScript(null) }}
+                >
+                  修改故事重新生成
+                </button>
               </div>
             </div>
           )}

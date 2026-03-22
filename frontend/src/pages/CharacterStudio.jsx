@@ -1,64 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Lightbox from '../components/Lightbox'
 import ImageEditPanel from '../components/ImageEditPanel'
+import TagEditor from '../components/TagEditor'
 
-const TAG_CATEGORIES = ['species', 'hair', 'clothing', 'role', 'personality', 'custom']
-const CATEGORY_LABELS = {
-  species: '種族',
-  hair: '髮型/髮色',
-  clothing: '服裝',
-  role: '角色定位',
-  personality: '個性',
-  custom: '自訂特徵',
-}
-
-function TagEditor({ tags, onChange }) {
-  const [inputs, setInputs] = useState({})
-
-  const addTag = (category) => {
-    const val = (inputs[category] || '').trim()
-    if (!val) return
-    const current = tags[category] || []
-    if (!current.includes(val)) {
-      onChange({ ...tags, [category]: [...current, val] })
-    }
-    setInputs({ ...inputs, [category]: '' })
-  }
-
-  const removeTag = (category, tag) => {
-    onChange({ ...tags, [category]: (tags[category] || []).filter(t => t !== tag) })
-  }
-
-  return (
-    <div className="tag-editor">
-      {TAG_CATEGORIES.map(cat => (
-        <div key={cat} className="tag-row">
-          <label>{CATEGORY_LABELS[cat]}</label>
-          <div className="tag-input-row">
-            <input
-              value={inputs[cat] || ''}
-              onChange={e => setInputs({ ...inputs, [cat]: e.target.value })}
-              onKeyDown={e => e.key === 'Enter' && addTag(cat)}
-              placeholder={`新增標籤...`}
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <button className="btn btn-secondary" onClick={() => addTag(cat)} style={{ width: 60 }}>
-              +
-            </button>
-          </div>
-          <div className="tags-display">
-            {(tags[cat] || []).map(tag => (
-              <span key={tag} className="tag">
-                {tag}
-                <button className="tag-remove" onClick={() => removeTag(cat, tag)}>×</button>
-              </span>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
+const ANALYZING_MSGS = ['分析圖片特徵中...', '識別外觀與個性...', '生成標籤建議...']
+const REGISTERING_MSGS = ['建立角色資料...', '生成正面角度圖...', '生成側面與背面圖...', '整理入庫中...']
 
 export default function CharacterStudio() {
   const [name, setName] = useState('')
@@ -77,6 +23,28 @@ export default function CharacterStudio() {
   const [lightbox, setLightbox] = useState(null)
   const [editingAngle, setEditingAngle] = useState(null)
   const [angleVersions, setAngleVersions] = useState({})
+  const [progressMsg, setProgressMsg] = useState('')
+  const progressRef = useRef(null)
+
+  useEffect(() => {
+    clearInterval(progressRef.current)
+    if (step === 'analyzing') {
+      let i = 0
+      setProgressMsg(ANALYZING_MSGS[0])
+      progressRef.current = setInterval(() => {
+        i = (i + 1) % ANALYZING_MSGS.length
+        setProgressMsg(ANALYZING_MSGS[i])
+      }, 3000)
+    } else if (step === 'registering') {
+      let i = 0
+      setProgressMsg(REGISTERING_MSGS[0])
+      progressRef.current = setInterval(() => {
+        i = Math.min(i + 1, REGISTERING_MSGS.length - 1)
+        setProgressMsg(REGISTERING_MSGS[i])
+      }, 20000)
+    }
+    return () => clearInterval(progressRef.current)
+  }, [step])
 
   const handlePhotoFiles = (e) => {
     const selected = Array.from(e.target.files)
@@ -206,7 +174,7 @@ export default function CharacterStudio() {
       {step === 'analyzing' && (
         <div className="card center">
           <div className="spinner" />
-          <p>正在使用 Gemini AI 分析角色特徵...</p>
+          <p>{progressMsg}</p>
         </div>
       )}
 
@@ -237,7 +205,7 @@ export default function CharacterStudio() {
       {step === 'registering' && (
         <div className="card center">
           <div className="spinner" />
-          <p>正在生成多角度角色圖表並入庫...</p>
+          <p>{progressMsg}</p>
           <p className="hint">這需要約 1-2 分鐘</p>
         </div>
       )}
